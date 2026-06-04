@@ -1,13 +1,14 @@
 # normalizer.py
 import re
 
+
 def normalize_persian_text(text: str) -> str:
     if not text:
         return ""
 
     # Convert Arabic characters to standard Persian
     text = text.replace("ي", "ی")
-    text = text.replace("ك", "ک")  # Fixed: Now converts to Persian 'ک'
+    text = text.replace("ك", "ک")
 
     # Enforce lowercase for English words
     text = text.lower()
@@ -17,6 +18,7 @@ def normalize_persian_text(text: str) -> str:
     text = text.strip()
 
     return text
+
 
 if __name__ == "__main__":
     sample_input = "  کاربر  كمك  می‌خواهد و VPN او قطع است  "

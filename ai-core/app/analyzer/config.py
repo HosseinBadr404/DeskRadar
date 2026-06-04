@@ -8,7 +8,7 @@ CATEGORY_MAP = {
     "حساب کاربری و رمز عبور": "account",
     "خرابی سخت‌افزار و تجهیزات": "hardware",
     "نصب و بروزرسانی نرم‌افزار": "software",
-    "دسترسی به فایل و پوشه اشتراکی": "permission"
+    "دسترسی به فایل و پوشه اشتراکی": "permission",
 }
 
 CATEGORY_LABELS_FA = list(CATEGORY_MAP.keys())
