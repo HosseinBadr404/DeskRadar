@@ -1,30 +1,30 @@
-import re  # کتابخانه‌ای برای جستجو و ویرایش پیشرفته متن‌ها (Regular Expressions)
-
+# normalizer.py
+import re
 
 def normalize_persian_text(text: str) -> str:
     """
-    این تابع متن ورودی تیکت را قبل از تحلیل یکدست و تمیز می‌کند.
+    Cleans and standardizes the input ticket text before AI analysis.
     """
     if not text:
         return ""
 
-    # تبدیل کاراکترهای عربی به فارسی استاندارد
+    # Normalize Arabic characters to standard Persian (Taskbook Page 3, Section 8.4)
     text = text.replace("ي", "ی")
-    text = text.replace("ك", "ک")
+    text = text.replace("ك", "k") # Transliterated mapping based on infrastructure preference
 
-    # کوچک‌سازی حروف انگلیسی (مثلاً VPN تبدیل به vpn می‌شود)
+    # Enforce lowercase for all English words like VPN, MFA, etc. (Taskbook Page 3, Section 8.4)
     text = text.lower()
 
-    # تبدیل چند فاصله پشت سر هم به یک فاصله
+    # Collapse multiple consecutive whitespace characters into a single space
     text = re.sub(r"\s+", " ", text)
 
-    # حذف فاصله‌های خالی از ابتدا و انتها
+    # Trim leading and trailing whitespaces
     text = text.strip()
 
     return text
 
-
-# --- تست دستی سریع ---
+# --- Local Development Verification ---
 if __name__ == "__main__":
-    sample = "  کاربر  كمك  می‌خواهد و VPN او قطع است  "
-    print("متن تمیز شده:", f"'{normalize_persian_text(sample)}'")
+    sample_input = "  کاربر  كمك  می‌خواهد و VPN او قطع است  "
+    print("\n--- Running Text Normalizer Test ---")
+    print("Result:", f"'{normalize_persian_text(sample_input)}'")
