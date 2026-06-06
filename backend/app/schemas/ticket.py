@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 
 
-class TicketCreate(BaseModel):
+class TicketCreateRequest(BaseModel):
 
     title: str
     description: str
@@ -11,7 +11,7 @@ class TicketCreate(BaseModel):
     department: str
 
 
-class TicketRead(BaseModel):
+class TicketResponse(BaseModel):
 
     id: int
     title: str
@@ -21,7 +21,7 @@ class TicketRead(BaseModel):
     status: str
     created_at: datetime
 
-class TicketUpdate(BaseModel):
+class TicketUpdateRequest(BaseModel):
 
     title: Optional[str] = None
     description: Optional[str] = None
