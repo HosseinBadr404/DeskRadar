@@ -1,0 +1,12 @@
+[
+  {"ticket_id": 1, "title": "VPN وصل نمیشه", "description": "خطای احراز هویت میده و نمیتونم وصل بشم", "category": "vpn", "status": "open"},
+  {"ticket_id": 2, "title": "نمیتونم به VPN وصل بشم", "description": "اتصال برقرار نمیشه و خطای احراز هویت میده", "category": "vpn", "status": "open"},
+  {"ticket_id": 3, "title": "VPN خیلی کنده", "description": "سرعت اتصال خیلی پایینه و فایلها باز نمیشن", "category": "vpn", "status": "open"},
+  {"ticket_id": 4, "title": "اتصال VPN مدام قطع میشه", "description": "هر چند دقیقه یکبار قطع و دوباره وصل میشه", "category": "vpn", "status": "open"},
+  {"ticket_id": 5, "title": "کد MFA قبول نمیشه", "description": "کد دو مرحله ای رو وارد میکنم ولی رد میشه و وصل نمیشم", "category": "vpn", "status": "open"},
+  {"ticket_id": 6, "title": "پرینتر آفلاینه", "description": "آفلاین نشون میده و هیچ فایلی چاپ نمیشه", "category": "printer", "status": "open"},
+  {"ticket_id": 7, "title": "پرینتر چیزی چاپ نمیکنه", "description": "وضعیت آفلاینه و سند ارسالی چاپ نمیشه", "category": "printer", "status": "open"},
+  {"ticket_id": 8, "title": "کاغذ توی پرینتر گیر کرده", "description": "موقع چاپ کاغذ گیر میکنه و خطا میده", "category": "printer", "status": "open"},
+  {"ticket_id": 9, "title": "کیفیت چاپ پایینه", "description": "چاپ کمرنگه و روی صفحه خط افتاده", "category": "printer", "status": "open"},
+  {"ticket_id": 10, "title": "نصب درایور پرینتر", "description": "پرینتر شناخته نمیشه و به درایور نیاز داره", "category": "printer", "status": "open"}
+]
