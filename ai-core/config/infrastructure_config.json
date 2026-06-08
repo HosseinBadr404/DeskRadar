@@ -1,0 +1,31 @@
+{
+  "embedding": {
+    "model_name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "model_version": "multilingual-MiniLM-L12-v2-v1",
+    "cache_dir": ".model_cache"
+  },
+  "similarity": {
+    "top_k": 5,
+    "threshold_similar": 0.75,
+    "threshold_very_similar": 0.85
+  },
+  "knowledge_base": {
+    "article_score_min": 0.7,
+    "cache_path": "data/.cache/article_embeddings.json"
+  },
+  "incident_detection": {
+    "similarity_floor": 0.75,
+    "medium_min_tickets": 2,
+    "medium_max_tickets": 3,
+    "high_min_tickets": 4
+  },
+  "qdrant": {
+    "enabled": false,
+    "host": "localhost",
+    "port": 6333,
+    "collection_tickets": "tickets",
+    "collection_articles": "articles",
+    "fallback_to_python": true,
+    "timeout_seconds": 3
+  }
+}
