@@ -273,6 +273,19 @@ Always returns HTTP **200**; controlled failures appear in the `error` field.
 }
 ```
 
+**Mapping to the Taskbook §2.3 `intelligence` block** (the Backend lifts/renames when merging):
+
+| §2.3 `intelligence` field | Source in `InfrastructureResult` |
+|---|---|
+| `similar_tickets[].ticket_id`, `.similarity` | `similar_tickets[]` (also exposes `match_level`, `title`, `category`) |
+| `related_article` | `related_article` (also exposes `category`, `tags`; `null` below the score floor) |
+| `possible_incident` | `incident.possible_incident` |
+| `incident_title_fa` | `incident.fa_title_incident` |
+
+> This service returns a **richer** incident object (`severity`, `fa_reason_incident`,
+> `matched_ticket_ids`, `avg_similarity_score`, `is_duplicate`). The Backend lifts the
+> two §2.3 fields out of it and may store the rest.
+
 ---
 
 ## Contract with Backend (pool semantics)
