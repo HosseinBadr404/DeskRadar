@@ -336,6 +336,12 @@ files and writes `docs/evaluation.md`:
 - **Category accuracy** — for each labeled eval ticket, the nearest tickets vote on
   category; reports overall and per-category accuracy.
 
+> **Selected operating threshold:** `similarity.threshold_similar = 0.70`. Among the
+> Taskbook §9.8 candidates {0.70, 0.75, 0.78, 0.82}, 0.70 has the highest pass rate
+> (0.8889) while the separation gap stays at 0.59 (> 0.15). The lower numbers the
+> script prints (0.48 = score midpoint, 0.65 = sweep argmax) are unconstrained
+> heuristics; we pin the operating point to a Taskbook-specified value for precision.
+
 The runner performs a pre-flight check that every pair ID resolves in the eval set,
 and warns (without changing thresholds) if the separation gap is below target.
 
