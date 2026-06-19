@@ -79,7 +79,7 @@ def test_knowledge_base_cache_loading(inject_mock_model):
         # Second build reads from cache
         # We can verify this by checking that it doesn't fail even if the model is not ready
         kb2 = KnowledgeBase()
-        # Mock model dimension is 4. Let's load cache into kb2
+        # Mock model dimension is 5. Let's load cache into kb2
         kb2.build_article_embeddings(articles, inject_mock_model, config)
         assert kb2.articles_indexed == 5
 
