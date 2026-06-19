@@ -44,6 +44,8 @@ _SERVICE_LABELS: dict[str, str] = {
     "printer": "پرینتر",
     "network": "شبکه",
     "account": "حساب کاربری",
+    "software": "نرم‌افزار",
+    "hardware": "سخت‌افزار",
 }
 
 _FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")

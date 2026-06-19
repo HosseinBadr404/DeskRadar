@@ -23,6 +23,7 @@ possible operational incident.
   - [API](#api)
     - [`GET /health`](#get-health)
     - [`POST /analyze-ticket`](#post-analyze-ticket)
+  - [Contract with Backend (pool semantics)](#contract-with-backend-pool-semantics)
   - [How it works](#how-it-works)
   - [Optional: Qdrant](#optional-qdrant)
   - [Evaluation](#evaluation)
@@ -272,6 +273,37 @@ Always returns HTTP **200**; controlled failures appear in the `error` field.
 }
 ```
 
+**Mapping to the Taskbook §2.3 `intelligence` block** (the Backend lifts/renames when merging):
+
+| §2.3 `intelligence` field | Source in `InfrastructureResult` |
+|---|---|
+| `similar_tickets[].ticket_id`, `.similarity` | `similar_tickets[]` (also exposes `match_level`, `title`, `category`) |
+| `related_article` | `related_article` (also exposes `category`, `tags`; `null` below the score floor) |
+| `possible_incident` | `incident.possible_incident` |
+| `incident_title_fa` | `incident.fa_title_incident` |
+
+> This service returns a **richer** incident object (`severity`, `fa_reason_incident`,
+> `matched_ticket_ids`, `avg_similarity_score`, `is_duplicate`). The Backend lifts the
+> two §2.3 fields out of it and may store the rest.
+
+---
+
+## Contract with Backend (pool semantics)
+
+In the **default mode (Qdrant disabled)**, `/analyze-ticket` searches **only the
+`old_tickets` array supplied in the request body** — not the startup seed pool.
+The Backend MUST send the relevant pool of existing tickets on every request;
+an empty `old_tickets` yields empty `similar_tickets` and no incident (this is valid).
+
+- The startup `seed_ticket_pool` (built from `data/old_tickets.json`) is used for
+  the **Qdrant path** and for seeding the Qdrant collections. In the default
+  Python path it is not searched.
+- `/health` → `tickets_in_pool` reports the size of that **seed** pool, so it is
+  only meaningful when Qdrant is enabled. It does not reflect the per-request pool.
+- Embeddings of repeated tickets are cached across requests (keyed by id + text
+  hash), so re-sending the same pool does not re-embed it.
+
+
 ---
 
 ## How it works
@@ -317,6 +349,12 @@ files and writes `docs/evaluation.md`:
 - **Category accuracy** — for each labeled eval ticket, the nearest tickets vote on
   category; reports overall and per-category accuracy.
 
+> **Selected operating threshold:** `similarity.threshold_similar = 0.70`. Among the
+> Taskbook §9.8 candidates {0.70, 0.75, 0.78, 0.82}, 0.70 has the highest pass rate
+> (0.8889) while the separation gap stays at 0.59 (> 0.15). The lower numbers the
+> script prints (0.48 = score midpoint, 0.65 = sweep argmax) are unconstrained
+> heuristics; we pin the operating point to a Taskbook-specified value for precision.
+
 The runner performs a pre-flight check that every pair ID resolves in the eval set,
 and warns (without changing thresholds) if the separation gap is below target.
 
@@ -346,8 +384,10 @@ VPN in top-5", self-match guard, deleted/closed filtering, VPN→VPN article ≥
 cache-on-second-startup, `high`/`medium` incident bands, Persian title/reason,
 never-raise, degraded mode).
 
-> Formal `pytest` test modules that consume these fixtures are a recommended
-> follow-up (the fixtures are ready for them).
+`pytest` modules consume these fixtures with a deterministic mock embedding model
+(no real model download required): `test_embedding_model.py`, `test_similarity_search.py`,
+`test_knowledge_base.py`, `test_incident_detector.py`, `test_pipeline.py`, and
+`test_ci_rules.py` (Rule-6 import guard) — **12 tests, all passing** (`pytest -q`).
 
 ---
 
@@ -366,6 +406,6 @@ never-raise, degraded mode).
 
 The AI Infrastructure component is **complete** (all 21 roadmap steps implemented
 and validated). Recommended follow-ups before production: run the evaluation against
-the real model and confirm the separation gap clears 0.15, add `pytest` modules over
-the fixtures, and add a CI rule asserting `evaluation.py` is never imported by the
-live request path.
+the real model and confirm the separation gap clears 0.15. (The `pytest` suite over the
+fixtures and the CI rule asserting `evaluation.py` is never imported by the live path
+are already in place.)

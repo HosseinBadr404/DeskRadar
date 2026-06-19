@@ -11,7 +11,7 @@ Embedding model version: `multilingual-MiniLM-L12-v2-v1`
 | Similar pairs avg score | 0.7803 |
 | Dissimilar pairs avg score | 0.1889 |
 | Separation gap (target > 0.15) | 0.5914 (meets target) |
-| Pass rate | 0.8444 |
+| Pass rate | 0.8889 |
 | Recommended threshold | 0.48 |
 
 ## Threshold Sweep
@@ -30,11 +30,11 @@ Embedding model version: `multilingual-MiniLM-L12-v2-v1`
 
 ## Category Accuracy
 
-Overall: **55 / 60 = 0.9167**
+Overall: **56 / 60 = 0.9333**
 
 | Category | Accuracy |
 |---|---|
-| account | 0.6667 |
+| account | 0.75 |
 | email | 1.0 |
 | network | 1.0 |
 | printer | 1.0 |

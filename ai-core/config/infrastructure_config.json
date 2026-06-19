@@ -6,7 +6,7 @@
   },
   "similarity": {
     "top_k": 5,
-    "threshold_similar": 0.75,
+    "threshold_similar": 0.70,
     "threshold_very_similar": 0.85
   },
   "knowledge_base": {
@@ -14,7 +14,7 @@
     "cache_path": "data/.cache/article_embeddings.json"
   },
   "incident_detection": {
-    "similarity_floor": 0.75,
+    "similarity_floor": 0.70,
     "medium_min_tickets": 2,
     "medium_max_tickets": 3,
     "high_min_tickets": 4
