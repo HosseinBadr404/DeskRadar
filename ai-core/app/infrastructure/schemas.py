@@ -54,6 +54,7 @@ class InfrastructureRequest(BaseModel):
     description: str
     category: str | None = None  # optional — from Analyzer output
     old_tickets: list[OldTicketRecord] = Field(default_factory=list)
+    open_incident_categories: set[str] = Field(default_factory=set)
 
 
 # ==============================================================================

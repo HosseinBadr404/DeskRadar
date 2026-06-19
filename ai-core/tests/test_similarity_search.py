@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from app.infrastructure.schemas import OldTicketRecord, TicketVectorEntry
 from app.infrastructure.similarity_search import find_similar_tickets
+from app.infrastructure.embedding_model import build_ticket_text
 
 
 def load_small_pool(model):
@@ -13,7 +14,7 @@ def load_small_pool(model):
     title_lookup = {}
     for item in data:
         record = OldTicketRecord(**item)
-        text = f"[{record.category}] {record.title} {record.description}"
+        text = build_ticket_text(record.title, record.description, record.category)
         vector = model.encode(text)
         pool.append(
             TicketVectorEntry(

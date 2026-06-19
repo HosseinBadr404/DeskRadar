@@ -30,20 +30,6 @@ def test_pipeline_integration(inject_mock_model):
             category="vpn",
             old_tickets=[]  # Empty live pool, since Qdrant is disabled it falls back to the startup seeded pool
         )
-        # In __init__.py, when Qdrant is disabled:
-        # pool, titles = _embed_records(request.old_tickets, model, config)
-        # Wait, if request.old_tickets is empty, let's verify if it defaults to the seed ticket pool!
-        # Let's check __init__.py:
-        # qa = _active_qdrant()
-        # if qa is not None:
-        #     pool, titles, qdrant_for_search = _state.seed_ticket_pool, _state.seed_title_lookup, qa
-        # else:
-        #     try:
-        #         pool, titles = _embed_records(request.old_tickets, model, config)
-        #     ...
-        # Wait! If Qdrant is NOT active, and the caller passes `request.old_tickets=[]`, it embeds `request.old_tickets` (which is empty) and searches over that empty pool!
-        # So we should pass the pool in `request.old_tickets` if we want to run Python cosine over it, OR we can mock it.
-        # Let's load existing tickets from tickets_small.json and pass them in `request.old_tickets`!
         # Let's check `tickets_small.json` loading.
         import json
         from app.infrastructure.schemas import OldTicketRecord
