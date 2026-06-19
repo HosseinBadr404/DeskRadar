@@ -71,27 +71,27 @@ existing tickets, and stores the returned intelligence block.
 
 ## Architecture
 
-```
-infrastructure_config.json  (single source of truth for thresholds)
-        │
-        ▼
-EmbeddingModel (singleton, loaded once at startup)
-        │                              │
-        ▼                              ▼
-similarity_search.py            knowledge_base.py
- (+ optional qdrant_adapter)    (+ optional qdrant_adapter)
-        │                              │
-        └──────────────┬───────────────┘
-                       ▼
-              incident_detector.py   (receives list[SimilarTicket]; never calls similarity_search)
-                       │
-                       ▼
-              __init__.py  →  run_infrastructure() orchestrates the pipeline
-                       │
-                       ▼
-              InfrastructureResult  →  app/main.py (FastAPI)
+```mermaid
+graph TD
+    Config["fa:fa-file-code infrastructure_config.json<br/>(single source of truth for thresholds)"]
+    Embedding["EmbeddingModel<br/>(singleton, loaded once at startup)"]
+    SimSearch["similarity_search.py<br/>(+ optional qdrant_adapter)"]
+    KB["knowledge_base.py<br/>(+ optional qdrant_adapter)"]
+    Detector["incident_detector.py<br/>(receives list[SimilarTicket]; never calls similarity_search)"]
+    Init["__init__.py<br/>run_infrastructure() orchestrates the pipeline"]
+    FastAPI["InfrastructureResult<br/>app/main.py (FastAPI)"]
+    Eval["evaluation.py<br/>offline only; imports the above, imported by none."]
 
-evaluation.py — offline only; imports the above, imported by none.
+    Config --> Embedding
+    Embedding --> SimSearch
+    Embedding --> KB
+    SimSearch --> Detector
+    KB --> Detector
+    Detector --> Init
+    Init --> FastAPI
+
+    %% Styling for the offline evaluation script to make it stand out
+    style Eval stroke-dasharray: 5 5, fill:#f9f9f9, stroke:#666
 ```
 
 - **Embedding model:** `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
