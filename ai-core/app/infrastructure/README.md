@@ -23,6 +23,7 @@ possible operational incident.
   - [API](#api)
     - [`GET /health`](#get-health)
     - [`POST /analyze-ticket`](#post-analyze-ticket)
+  - [Contract with Backend (pool semantics)](#contract-with-backend-pool-semantics)
   - [How it works](#how-it-works)
   - [Optional: Qdrant](#optional-qdrant)
   - [Evaluation](#evaluation)
@@ -274,6 +275,24 @@ Always returns HTTP **200**; controlled failures appear in the `error` field.
 
 ---
 
+## Contract with Backend (pool semantics)
+
+In the **default mode (Qdrant disabled)**, `/analyze-ticket` searches **only the
+`old_tickets` array supplied in the request body** — not the startup seed pool.
+The Backend MUST send the relevant pool of existing tickets on every request;
+an empty `old_tickets` yields empty `similar_tickets` and no incident (this is valid).
+
+- The startup `seed_ticket_pool` (built from `data/old_tickets.json`) is used for
+  the **Qdrant path** and for seeding the Qdrant collections. In the default
+  Python path it is not searched.
+- `/health` → `tickets_in_pool` reports the size of that **seed** pool, so it is
+  only meaningful when Qdrant is enabled. It does not reflect the per-request pool.
+- Embeddings of repeated tickets are cached across requests (keyed by id + text
+  hash), so re-sending the same pool does not re-embed it.
+
+
+---
+
 ## How it works
 
 Per request, `run_infrastructure()` runs a fixed pipeline:
@@ -346,8 +365,10 @@ VPN in top-5", self-match guard, deleted/closed filtering, VPN→VPN article ≥
 cache-on-second-startup, `high`/`medium` incident bands, Persian title/reason,
 never-raise, degraded mode).
 
-> Formal `pytest` test modules that consume these fixtures are a recommended
-> follow-up (the fixtures are ready for them).
+`pytest` modules consume these fixtures with a deterministic mock embedding model
+(no real model download required): `test_embedding_model.py`, `test_similarity_search.py`,
+`test_knowledge_base.py`, `test_incident_detector.py`, `test_pipeline.py`, and
+`test_ci_rules.py` (Rule-6 import guard) — **12 tests, all passing** (`pytest -q`).
 
 ---
 
@@ -366,6 +387,6 @@ never-raise, degraded mode).
 
 The AI Infrastructure component is **complete** (all 21 roadmap steps implemented
 and validated). Recommended follow-ups before production: run the evaluation against
-the real model and confirm the separation gap clears 0.15, add `pytest` modules over
-the fixtures, and add a CI rule asserting `evaluation.py` is never imported by the
-live request path.
+the real model and confirm the separation gap clears 0.15. (The `pytest` suite over the
+fixtures and the CI rule asserting `evaluation.py` is never imported by the live path
+are already in place.)

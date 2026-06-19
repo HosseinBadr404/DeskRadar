@@ -425,10 +425,11 @@ def _validate_config_coherence(config: dict) -> None:
     try:
         floor = float(inc.get("similarity_floor"))
         t_sim = float(sim.get("threshold_similar"))
-        if floor > t_sim:
+        if floor < t_sim:
             logger.warning(
-                "Config coherence: incident_detection.similarity_floor (%.2f) > "
-                "similarity.threshold_similar (%.2f); the floor is unreachable.", floor, t_sim
+                "Config coherence: incident_detection.similarity_floor (%.2f) < "
+                "similarity.threshold_similar (%.2f); the floor has no effect because "
+                "similar_tickets are already filtered at the higher threshold.", floor, t_sim
             )
     except (TypeError, ValueError):
         pass
