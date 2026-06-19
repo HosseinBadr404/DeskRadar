@@ -1,0 +1,10 @@
+{
+  "similar_pairs": [
+    {"ticket_a": 1, "ticket_b": 2, "expected": "similar"},
+    {"ticket_a": 6, "ticket_b": 7, "expected": "similar"}
+  ],
+  "dissimilar_pairs": [
+    {"ticket_a": 1, "ticket_b": 6, "expected": "dissimilar"},
+    {"ticket_a": 5, "ticket_b": 9, "expected": "dissimilar"}
+  ]
+}
