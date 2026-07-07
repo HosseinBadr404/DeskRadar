@@ -1,0 +1,10 @@
+﻿# ServiceDesk Radar — AI Core (Infrastructure) dependencies
+# Python 3.10+
+ 
+fastapi>=0.111.0
+uvicorn>=0.29.0
+pydantic>=2.7.0
+sentence-transformers>=2.7.0
+numpy>=1.26.0
+qdrant-client>=1.9.0
+python-dotenv>=1.0.0

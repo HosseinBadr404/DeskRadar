@@ -1,0 +1,20 @@
+{
+  "existing_tickets": [
+    {"ticket_id": 1, "title": "VPN وصل نمیشه", "description": "خطای احراز هویت میده و نمیتونم وصل بشم", "category": "vpn", "status": "open"},
+    {"ticket_id": 2, "title": "VPN خطا میده", "description": "موقع اتصال خطای احراز هویت میگیرم و وصل نمیشم", "category": "vpn", "status": "open"},
+    {"ticket_id": 3, "title": "دسترسی VPN قطع شده", "description": "از صبح اتصال VPN برقرار نمیشه و قطعه", "category": "vpn", "status": "open"},
+    {"ticket_id": 4, "title": "VPN کار نمیکنه", "description": "بعد از وارد کردن رمز خطا میده و اتصال برقرار نمیشه", "category": "vpn", "status": "open"},
+    {"ticket_id": 5, "title": "اتصال VPN مشکل داره", "description": "نمیتونم به VPN وصل بشم و مدام خطا میده", "category": "vpn", "status": "open"}
+  ],
+  "new_ticket": {
+    "ticket_id": 99,
+    "title": "VPN وصل نمیشه امروز",
+    "description": "از صبح نمیتونم به VPN وصل بشم و خطای احراز هویت میده",
+    "category": "vpn"
+  },
+  "expected": {
+    "possible_incident": true,
+    "severity": "high",
+    "min_similar_tickets": 4
+  }
+}
