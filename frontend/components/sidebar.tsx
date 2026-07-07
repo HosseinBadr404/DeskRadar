@@ -4,18 +4,24 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
+interface MenuItem {
+  name: string;
+  href: string;
+  roles: ("admin" | "user")[];
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   if (!user) return null;
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     { name: "خلاصه گزارشات", href: "/", roles: ["admin", "user"] },
+    { name: "صندوق تیکت‌ها", href: "/tickets", roles: ["admin"] },
     { name: "تیکت‌های من", href: "/my-tickets", roles: ["user"] },
     { name: "اینباکس ارجاعات (AI)", href: "/admin/escalated", roles: ["admin"] },
     { name: "پایگاه دانش (KB)", href: "/knowledge-base", roles: ["admin", "user"] },
-    { name: "تنظیمات سیستم", href: "/settings", roles: ["admin"] },
   ];
 
   const allowedItems = menuItems.filter((item) => item.roles.includes(user.role));
@@ -41,8 +47,17 @@ export default function Sidebar() {
         })}
       </nav>
       
-      <div className="px-4 py-2 text-[10px] text-slate-400 font-medium tracking-wide border-t border-slate-100 pt-3">
-        دسترسی: {user.role === "admin" ? "مدیر پشتیبانی" : "کاربر سازمان"}
+      <div className="border-t border-slate-100 pt-3 space-y-2">
+        
+        <button 
+          onClick={logout}
+          className="w-full text-right px-4 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+        >
+        خروج از حساب
+        </button>
+        <div className="px-4 text-[10px] text-slate-400 font-medium">
+          نقش: {user.role === "admin" ? "مدیر پشتیبانی" : "کاربر سازمان"}
+        </div>
       </div>
     </aside>
   );

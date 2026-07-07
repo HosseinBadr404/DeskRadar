@@ -1,4 +1,5 @@
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata = {
   title: "ServiceDesk Radar",
@@ -13,7 +14,9 @@ export default function RootLayout({
   return (
     <html lang="fa" dir="rtl">
       <body>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/auth-context";
 
 export default function Header() {
-  const { user, toggleRole } = useAuth();
+  const { user } = useAuth();
 
   return (
     <header className="h-18 bg-white border-b border-slate-200 flex items-center shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
@@ -15,11 +15,6 @@ export default function Header() {
       <div className="flex-1 h-full px-6 flex items-center justify-end gap-6">
         
         <div className="flex items-center gap-6 text-sm text-slate-500">
-          <button 
-            onClick={toggleRole}
-            className="text-xs font-bold hover:underline  hover:text-slate-800 transition-colors cursor-pointer">
-           سوییچ نقش
-          </button>
           <button className="flex items-center gap-1 hover:text-slate-800 transition-colors cursor-pointer">
            مدیریت
           </button>

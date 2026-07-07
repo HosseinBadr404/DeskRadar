@@ -1,30 +1,62 @@
 "use client";
 
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 type Role = "admin" | "user";
 
+interface User {
+  name: string;
+  role: Role;
+  email: string;
+}
+
 interface AuthContextType {
-  user: { name: string; role: Role } | null;
-  toggleRole: () => void;
+  user: User | null;
+  isLoading: boolean;
+  login: (username: string, role: Role) => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<{ name: string; role: Role } | null>({
-    name: "احمد احمدی",
-    role: "admin",
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true); 
+  const router = useRouter();
 
-  const toggleRole = () => {
-    setUser((prev) => 
-      prev ? { ...prev, role: prev.role === "admin" ? "user" : "admin" } : null
-    );
+  useEffect(() => {
+    const savedUser = localStorage.getItem("deskradar_user");
+    
+    const timer = setTimeout(() => {
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+      setIsLoading(false);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const login = (username: string, role: Role) => {
+    const mockUser: User = {
+      name: username || "کاربر سیستم",
+      role: role,
+      email: `${role}@deskino.com`,
+    };
+    setUser(mockUser);
+    localStorage.setItem("deskradar_user", JSON.stringify(mockUser));
+    router.push("/");
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("deskradar_user");
+    router.push("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, toggleRole }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
