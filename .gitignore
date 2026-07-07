@@ -1,0 +1,11 @@
+.venv/
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+.env
+
+# AI model cache & computed embeddings cache
+ai-core/.model_cache/
+ai-core/data/.cache/
+data/
