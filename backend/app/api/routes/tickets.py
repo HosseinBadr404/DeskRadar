@@ -1,21 +1,32 @@
 from fastapi import APIRouter, status, HTTPException
 from app.schemas.ticket import TicketCreateRequest, TicketResponse
+from app.services.ticket_service import TicketService
 from datetime import datetime
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
+ticket_service = TicketService()
+
 @router.post("/", status_code=status.HTTP_201_CREATED) #ریکوئست ایجاد تیکت جدید
 async def create_ticket(ticket_in: TicketCreateRequest):
     
-    return {
-        "ticket_id": 12,
-        "title": ticket_in.title,
-        "description": ticket_in.description,
-        "requester": ticket_in.requester,
-        "department": ticket_in.department,
-        "status": "pending",
-        "created_at": datetime.now(), 
-    }
+    try:
+
+        response = await ticket_service.creat_ticket(
+            **ticket_in.model_dump(),
+            auto_analyze=True
+            )
+        return response;
+
+    except HTTPException as http_ex:
+        raise http_ex
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail= f"Unknow internal error eccursed: {str(e)}"
+        )
+
 
 @router.get("/", status_code=status.HTTP_200_OK) #//TODO: ریکوئست دریافت لیست تیکت ها با فیلتر
 async def get_all_tickets():
