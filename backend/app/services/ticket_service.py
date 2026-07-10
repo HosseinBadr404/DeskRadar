@@ -1,49 +1,38 @@
-from app.models.ticket import Ticket
+from fastapi import HTTPException, status
+from app.repositories.ticket_repository import TicketRepository
+from app.core.data_enum import Analysis_Status, Ticket_Status
 from app.services.analysis_service import AnalysisService
-from app.services.incident_service import IncidentService
-from app.services.alert_service import AlertService
-
+from typing import Optional
 
 class TicketService:
 
     def __init__(self):
 
-        self.analysis_service = AnalysisService()
-        self.incident_service = IncidentService()
-        self.alert_service = AlertService()
+        self.ticket_repo = TicketRepository()
+        self.analysis_serv = AnalysisService()
 
-    def create_ticket(
-        self,
-        title: str,
-        description: str,
-        requester: str,
-        department: str
-    ):
-
-        ticket = Ticket(
+    async def creat_ticket(
+        self, 
+        title: str, 
+        description: str, 
+        requester: Optional[str], 
+        department: Optional[str], 
+        auto_analyze: bool = True
+    ) -> dict:
+        
+        ALREADY_EXIST = await self.ticket_repo.is_already_exist(title=title, description=description, requester=requester)
+        
+        if ALREADY_EXIST:
+            raise HTTPException(
+                status_code= status.HTTP_400_BAD_REQUEST,
+                detail= "Ticket has already been submitted and it is in progress."
+            )
+        
+        ticket_data = await self.ticket_repo.save_new_ticket(
             title=title,
             description=description,
             requester=requester,
             department=department
         )
 
-        analysis = self.analysis_service.analyze_ticket(
-            title=title,
-            description=description
-        )
-
-        
-        incident = self.incident_service.detect_incident(
-            analysis
-        )
-
-        alert = self.alert_service.generate_alert(
-            analysis
-        )
-
-        return {
-            "ticket": ticket,
-            "analysis": analysis,
-            "incident": incident,
-            "alert": alert
-        }
+        return ticket_data
