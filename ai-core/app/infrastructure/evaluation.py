@@ -7,7 +7,7 @@ return the Pydantic report models from schemas.py:
 
   * eval_similarity_quality(...)  -> SimilarityReport
   * eval_threshold_sweep(...)     -> ThresholdReport
-  * eval_category_accuracy(...)   -> CategoryReport
+  * eval_retrieval_category_accuracy(...) -> CategoryReport
 
 Rule 6 — this module is OFFLINE ONLY. It MAY import from embedding_model,
 similarity_search, knowledge_base, incident_detector. It MUST NEVER be imported
@@ -140,20 +140,23 @@ def eval_threshold_sweep(
     )
 
 
-def eval_category_accuracy(
+def eval_retrieval_category_accuracy(
     eval_set_path: str = _DEFAULT_EVAL_SET_PATH,
     old_tickets_path: str = _DEFAULT_OLD_TICKETS_PATH,
     model: EmbeddingModel | None = None,
     config: dict | None = None,
 ) -> CategoryReport:
     """
+    Measure retrieval-derived category accuracy, not the separate Analyzer model.
     For each eval ticket, retrieve similar tickets from the FULL old_tickets pool
     and predict its category by majority vote among the returned SimilarTickets
     (tie-break: category of the highest-scoring ticket). Compare to expected_category.
     """
     model = model or EmbeddingModel.instance()
     if config is None:
-        raise ValueError("eval_category_accuracy requires config (similarity thresholds, top_k).")
+        raise ValueError(
+            "eval_retrieval_category_accuracy requires config (similarity thresholds, top_k)."
+        )
 
     eval_tickets = _load_eval_list(eval_set_path)
     pool, title_lookup = _build_pool(old_tickets_path, model)
@@ -189,6 +192,25 @@ def eval_category_accuracy(
         correct=correct,
         accuracy=accuracy,
         per_category=per_category,
+    )
+
+
+def eval_category_accuracy(
+    eval_set_path: str = _DEFAULT_EVAL_SET_PATH,
+    old_tickets_path: str = _DEFAULT_OLD_TICKETS_PATH,
+    model: EmbeddingModel | None = None,
+    config: dict | None = None,
+) -> CategoryReport:
+    """Backward-compatible alias; use eval_retrieval_category_accuracy instead."""
+    logger.warning(
+        "eval_category_accuracy is a retrieval metric, not an Analyzer metric; "
+        "use eval_retrieval_category_accuracy instead."
+    )
+    return eval_retrieval_category_accuracy(
+        eval_set_path,
+        old_tickets_path,
+        model,
+        config,
     )
 
 
