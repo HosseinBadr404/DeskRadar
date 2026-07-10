@@ -19,7 +19,7 @@ Critical/High fixes folded in.
 | Load embedding model once at startup | ✅ | `embedding_model.py` (singleton, loaded in startup) |
 | Build standardized ticket text | ✅ | `build_ticket_text()` |
 | Encode new ticket → vector | ✅ | `EmbeddingModel.encode()` / `encode_batch()` |
-| Store embedding (don't re-embed unless text changes) | ✅ | article cache + cross-request ticket-vector cache |
+| Store embedding (don't re-embed unless text changes) | ✅ | persistent article and ticket-vector caches, keyed by text hash + model version |
 | Record `embedding_model_version` | ✅ | `model_version` → `InfrastructureResult` / health |
 
 ### §9.4 Similar Ticket Search
@@ -30,7 +30,7 @@ Critical/High fixes folded in.
 | Store similarity score | ✅ | `SimilarTicket.similarity` |
 | Threshold from config | ✅ | `similarity.threshold_similar` / `threshold_very_similar` |
 | Self-match guard | ✅ | `query_ticket_id` excluded |
-| Test with Persian dataset | ⚠️ partial | fixtures + behavior validated; formal `pytest` module pending |
+| Test with Persian dataset | ✅ | `test_persian_pipeline.py` validates VPN and printer requests over the full Persian dataset |
 
 ### §9.5 Knowledge Base Retrieval
 | Taskbook task | Status | Where |
@@ -49,7 +49,7 @@ Critical/High fixes folded in.
 | Detect high (≥4) | ✅ | config bands |
 | Persian incident title | ✅ | `fa_title_incident` |
 | Persian incident reason | ✅ | `fa_reason_incident` (Persian digits) |
-| Avoid duplicate incident | ✅ | `is_duplicate` via `open_incident_categories` |
+| Avoid duplicate incident | ✅ | cluster-overlap dedup via `open_incidents`, returning `duplicate_incident_id` |
 
 ### §9.7 Qdrant (optional)
 | Taskbook task | Status | Where |
@@ -65,7 +65,7 @@ Critical/High fixes folded in.
 |---|---|---|
 | `evaluation_set.json` (≥50) | ✅ | 60 labeled tickets |
 | Similarity ground truth | ✅ | `similarity_pairs.json` (23+22) |
-| Category accuracy | ✅ | `eval_category_accuracy()` |
+| Retrieval category accuracy | ✅ | `eval_retrieval_category_accuracy()`; Analyzer accuracy is a joint integration metric |
 | Similarity quality | ✅ | `eval_similarity_quality()` |
 | Choose final threshold | ✅ | `eval_threshold_sweep()` |
 | Quality report for README / `docs/evaluation.md` | ✅ | `scripts/evaluate_infrastructure.py` |
@@ -85,9 +85,9 @@ Critical/High fixes folded in.
 ## 2. Remaining — IN SCOPE (small follow-ups)
 
 1. **`requirements.txt`** — ✅ now added.
-2. **Formal `pytest` test modules** over `tests/fixtures/` (fixtures are ready; behavior already validated ad-hoc). Recommended: `test_similarity.py`, `test_knowledge_base.py`, `test_incident_detector.py`, `test_pipeline.py`.
-3. **Run the real model once** → `seed_embeddings.py` then `evaluate_infrastructure.py`; commit the generated `docs/evaluation.md` and confirm `separation_gap > 0.15`. If not, revise the offending dissimilar pairs (not the thresholds).
-4. **CI guard for Rule 6** — assert `evaluation.py` is never imported by the live path (grep rule is in its docstring).
+2. **Test suite** — ✅ cache persistence, Persian VPN/printer, error responses, config validation, and Rule 6 are covered by `pytest`.
+3. **Real-model evaluation** — ✅ `docs/evaluation.md` was regenerated; separation gap is `0.5914` (> `0.15`) and retrieval category accuracy is `0.9333`.
+4. **Qdrant parity** — deferred while `qdrant.enabled=false`; required before Qdrant is enabled.
 5. **Place files at repo paths** — the deliverables here are flat-named; map them to the tree in §4 below.
 
 ## 3. Remaining — OUT OF SCOPE (other owners, for full-picture awareness)
@@ -153,7 +153,7 @@ Critical/High fixes folded in.
 
 ## 6. Open verification items (need the real model / runtime)
 
-1. **Separation gap** — confirm `> 0.15` on the real multilingual-MiniLM model (H11).
-2. **Cache-on-second-startup** — confirm zero re-encodes on the 2nd `seed_embeddings.py` run.
-3. **Qdrant parity** (only if enabling Qdrant) — confirm Qdrant vs Python results don't diverge sharply.
+1. **Separation gap** — ✅ real-model result is `0.5914` (> `0.15`).
+2. **Cache-on-second-startup** — ✅ covered by deterministic ticket/article cache tests; recheck after deployment configuration changes.
+3. **Qdrant parity** (only if enabling Qdrant) — deferred while Qdrant remains disabled.
 4. **Latency** — confirm per-request `latency_ms` is acceptable on the target VPS.

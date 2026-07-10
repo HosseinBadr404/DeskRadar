@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ==============================================================================
 # Input Models
@@ -46,6 +46,14 @@ class KnowledgeArticle(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class OpenIncidentRecord(BaseModel):
+    """Minimal open-incident context supplied by the Backend for deduplication."""
+
+    incident_id: int = Field(gt=0)
+    category: str = Field(min_length=1)
+    matched_ticket_ids: set[int] = Field(default_factory=set)
+
+
 class InfrastructureRequest(BaseModel):
     """Per-ticket request received by run_infrastructure()."""
 
@@ -54,7 +62,7 @@ class InfrastructureRequest(BaseModel):
     description: str
     category: str | None = None  # optional — from Analyzer output
     old_tickets: list[OldTicketRecord] = Field(default_factory=list)
-    open_incident_categories: set[str] = Field(default_factory=set)
+    open_incidents: list[OpenIncidentRecord] = Field(default_factory=list)
 
 
 # ==============================================================================
@@ -78,6 +86,15 @@ class EmbeddingCacheEntry(BaseModel):
     vector: list[float] = Field(min_length=1)
     model_version: str
     text_hash: str  # detects article content changes between startups
+
+
+class TicketEmbeddingCacheEntry(BaseModel):
+    """Persisted ticket embedding, reused across service restarts."""
+
+    ticket_id: int
+    vector: list[float] = Field(min_length=1)
+    model_version: str
+    text_hash: str  # changes whenever title, description, or category changes
 
 
 # ==============================================================================
@@ -108,7 +125,8 @@ class IncidentCandidate(BaseModel):
     fa_reason_incident: str | None = None
     matched_ticket_ids: list[int] = Field(default_factory=list)
     avg_similarity_score: float | None = Field(default=None, ge=0.0, le=1.0)
-    is_duplicate: bool = False  # True -> Backend updates existing incident
+    is_duplicate: bool = False
+    duplicate_incident_id: int | None = None  # Backend updates this incident when present
 
 
 class InfrastructureResult(BaseModel):
@@ -157,3 +175,67 @@ class CategoryReport(BaseModel):
     correct: int
     accuracy: float
     per_category: dict[str, float] = Field(default_factory=dict)
+
+
+# ==============================================================================
+# Configuration Models
+# ==============================================================================
+
+
+class EmbeddingConfig(BaseModel):
+    model_name: str = Field(min_length=1)
+    model_version: str = Field(min_length=1)
+    cache_dir: str = Field(min_length=1)
+
+
+class TicketEmbeddingConfig(BaseModel):
+    cache_path: str = Field(min_length=1)
+
+
+class SimilarityConfig(BaseModel):
+    top_k: int = Field(ge=1)
+    threshold_similar: float = Field(ge=0.0, le=1.0)
+    threshold_very_similar: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def very_similar_must_not_be_lower(self):
+        if self.threshold_very_similar < self.threshold_similar:
+            raise ValueError("threshold_very_similar must be >= threshold_similar")
+        return self
+
+
+class KnowledgeBaseConfig(BaseModel):
+    article_score_min: float = Field(ge=0.0, le=1.0)
+    cache_path: str = Field(min_length=1)
+
+
+class IncidentDetectionConfig(BaseModel):
+    similarity_floor: float = Field(ge=0.0, le=1.0)
+    medium_min_tickets: int = Field(ge=1)
+    medium_max_tickets: int = Field(ge=1)
+    high_min_tickets: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def medium_range_must_be_ordered(self):
+        if self.medium_max_tickets < self.medium_min_tickets:
+            raise ValueError("medium_max_tickets must be >= medium_min_tickets")
+        return self
+
+
+class QdrantConfig(BaseModel):
+    enabled: bool
+    host: str = Field(min_length=1)
+    port: int = Field(ge=1, le=65535)
+    collection_tickets: str = Field(min_length=1)
+    collection_articles: str = Field(min_length=1)
+    fallback_to_python: bool
+    timeout_seconds: float = Field(gt=0.0)
+
+
+class InfrastructureConfig(BaseModel):
+    embedding: EmbeddingConfig
+    ticket_embeddings: TicketEmbeddingConfig
+    similarity: SimilarityConfig
+    knowledge_base: KnowledgeBaseConfig
+    incident_detection: IncidentDetectionConfig
+    qdrant: QdrantConfig

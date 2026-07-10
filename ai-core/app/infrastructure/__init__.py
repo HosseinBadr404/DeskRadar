@@ -41,7 +41,9 @@ import hashlib
 import json
 import logging
 import os
+import tempfile
 import time
+from pathlib import Path
 
 from .embedding_model import (
     EmbeddingModel,
@@ -56,7 +58,9 @@ from .schemas import (
     InfrastructureHealthStatus,
     InfrastructureRequest,
     InfrastructureResult,
+    InfrastructureConfig,
     OldTicketRecord,
+    TicketEmbeddingCacheEntry,
     TicketVectorEntry,
 )
 from .similarity_search import find_similar_tickets
@@ -72,6 +76,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_CONFIG_PATH = "config/infrastructure_config.json"
 _DEFAULT_OLD_TICKETS_PATH = "data/old_tickets.json"
 _DEFAULT_ARTICLES_PATH = "data/knowledge_articles.json"
+_DEFAULT_TICKET_EMBEDDING_CACHE_PATH = "data/.cache/ticket_embeddings.json"
 
 
 # ---------------------------------------------------------------------------- #
@@ -90,8 +95,9 @@ class _State:
         self.kb: KnowledgeBase | None = None
         self.qdrant: QdrantAdapter | None = None
         self.startup_latency_ms: float = 0.0
-        # cross-request ticket embedding cache (§9.3: never re-embed unless text changes)
-        self.ticket_vec_cache: dict[tuple[int, str], list[float]] = {}
+        # Persistent ticket embedding cache. Key: (ticket_id, text_hash, model_version).
+        # It is rehydrated on startup so unchanged tickets are not re-embedded.
+        self.ticket_vec_cache: dict[tuple[int, str, str], list[float]] = {}
 
 
 _state = _State()
@@ -104,6 +110,9 @@ def initialize_infrastructure() -> InfrastructureHealthStatus:
     """Run the startup sequence once (called from the FastAPI lifespan). Never raises."""
     t0 = time.perf_counter()
     _state.reset()
+
+    _load_environment()
+    _configure_logging()
 
     # Step 1 — config (fatal on failure)
     try:
@@ -121,7 +130,7 @@ def initialize_infrastructure() -> InfrastructureHealthStatus:
         if not getattr(model, "is_ready", False):
             model.load(
                 emb.get("model_name"),
-                cache_dir=emb.get("cache_dir"),
+                cache_dir=os.environ.get("HF_HOME") or emb.get("cache_dir"),
                 model_version=emb.get("model_version"),
             )
         _state.model_ready = bool(getattr(model, "is_ready", False))
@@ -131,6 +140,10 @@ def initialize_infrastructure() -> InfrastructureHealthStatus:
         logger.exception("Embedding model load failed; starting in degraded mode.")
         _state.startup_latency_ms = _elapsed_ms(t0)
         return _health_degraded(config, "model_not_ready")
+
+    # Step 2.5 — rehydrate the persistent ticket-vector cache. A corrupt cache
+    # is treated as a cache miss, never as a startup failure.
+    _state.ticket_vec_cache = _load_ticket_vector_cache(config, model)
 
     # Step 3 — old tickets pool (skip invalid / missing -> empty, never crash)
     try:
@@ -233,7 +246,7 @@ def run_infrastructure(request: InfrastructureRequest) -> InfrastructureResult:
             similar,
             request.category,
             config,
-            open_incident_categories=getattr(request, "open_incident_categories", None),
+            open_incidents=request.open_incidents,
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Incident detection failed.")
@@ -256,7 +269,7 @@ def run_infrastructure(request: InfrastructureRequest) -> InfrastructureResult:
 
 
 # ---------------------------------------------------------------------------- #
-# Embedding the ticket pool (with cross-request cache, §9.3)
+# Embedding the ticket pool (with persistent cache, §9.3)
 # ---------------------------------------------------------------------------- #
 def _embed_records(
     records: list[OldTicketRecord], model: "EmbeddingModel", config: dict
@@ -266,13 +279,30 @@ def _embed_records(
 
     pending_idx: list[int] = []
     pending_texts: list[str] = []
-    pending_keys: list[tuple[int, str]] = []
+    pending_keys: list[tuple[int, str, str]] = []
     vectors: list[list[float] | None] = []
+    model_version = _expected_embedding_model_version(config, model)
+    cache_changed = False
 
     for rec in records or []:
         text = build_ticket_text(rec.title, rec.description, rec.category)
-        key = (rec.ticket_id, _text_hash(text))
+        text_hash = _text_hash(text)
+        key = (rec.ticket_id, text_hash, model_version)
         titles[rec.ticket_id] = rec.title
+
+        # A ticket ID represents one current text. Drop stale vectors for that
+        # ID/model when title, description, or category changes.
+        stale_keys = [
+            cached_key
+            for cached_key in _state.ticket_vec_cache
+            if cached_key[0] == rec.ticket_id
+            and cached_key[2] == model_version
+            and cached_key[1] != text_hash
+        ]
+        for stale_key in stale_keys:
+            del _state.ticket_vec_cache[stale_key]
+            cache_changed = True
+
         cached = _state.ticket_vec_cache.get(key)
         if cached is not None:
             vectors.append(cached)
@@ -284,9 +314,17 @@ def _embed_records(
 
     if pending_texts:
         encoded = model.encode_batch(pending_texts)
+        if len(encoded) != len(pending_texts):
+            raise ValueError(
+                "Embedding model returned a vector count different from the ticket input count."
+            )
         for slot, key, vec in zip(pending_idx, pending_keys, encoded):
             vectors[slot] = vec
             _state.ticket_vec_cache[key] = vec
+        cache_changed = True
+
+    if cache_changed:
+        _write_ticket_vector_cache(config, _state.ticket_vec_cache)
 
     for rec, vec in zip(records or [], vectors):
         pool.append(
@@ -301,12 +339,118 @@ def _embed_records(
 
 
 # ---------------------------------------------------------------------------- #
+# Persistent ticket embedding cache
+# ---------------------------------------------------------------------------- #
+def _load_ticket_vector_cache(
+    config: dict, model: "EmbeddingModel"
+) -> dict[tuple[int, str, str], list[float]]:
+    """Load valid vectors for the active model; invalid entries become cache misses."""
+    cache_path = _ticket_embedding_cache_path(config)
+    p = Path(cache_path)
+    if not p.exists():
+        return {}
+
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - cache is an optimization, never a startup dependency
+        logger.warning("Could not read ticket embedding cache %s; rebuilding as needed.", cache_path)
+        return {}
+
+    if not isinstance(raw, list):
+        logger.warning("Ticket embedding cache %s is not a list; rebuilding as needed.", cache_path)
+        return {}
+
+    expected_version = _expected_embedding_model_version(config, model)
+    try:
+        expected_dimension = int(model.dimension)
+    except Exception:  # noqa: BLE001
+        expected_dimension = None
+
+    cache: dict[tuple[int, str, str], list[float]] = {}
+    for record in raw:
+        try:
+            entry = TicketEmbeddingCacheEntry(**record)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Skipping invalid ticket embedding cache entry (%s): %r", exc, record)
+            continue
+
+        if entry.model_version != expected_version:
+            continue
+        if expected_dimension is not None and len(entry.vector) != expected_dimension:
+            logger.warning(
+                "Skipping ticket embedding cache entry %s because its vector dimension changed.",
+                entry.ticket_id,
+            )
+            continue
+        cache[(entry.ticket_id, entry.text_hash, entry.model_version)] = entry.vector
+
+    logger.info("Loaded %d ticket embedding(s) from cache %s.", len(cache), cache_path)
+    return cache
+
+
+def _write_ticket_vector_cache(
+    config: dict, cache: dict[tuple[int, str, str], list[float]]
+) -> None:
+    """Atomically persist ticket vectors so an interrupted write cannot corrupt the cache."""
+    cache_path = _ticket_embedding_cache_path(config)
+    p = Path(cache_path)
+    tmp_path: Path | None = None
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        payload = [
+            {
+                "ticket_id": ticket_id,
+                "text_hash": text_hash,
+                "model_version": model_version,
+                "vector": vector,
+            }
+            for (ticket_id, text_hash, model_version), vector in sorted(cache.items())
+        ]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=p.parent,
+            prefix=f".{p.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as tmp:
+            json.dump(payload, tmp, ensure_ascii=False)
+            tmp_path = Path(tmp.name)
+        os.replace(tmp_path, p)
+        tmp_path = None
+        logger.info("Wrote %d ticket embedding(s) to cache %s.", len(payload), cache_path)
+    except Exception:  # noqa: BLE001 - cache writes never break ticket analysis
+        logger.exception("Failed to write ticket embedding cache %s.", cache_path)
+    finally:
+        if tmp_path is not None:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def _ticket_embedding_cache_path(config: dict) -> str:
+    return config.get("ticket_embeddings", {}).get(
+        "cache_path", _DEFAULT_TICKET_EMBEDDING_CACHE_PATH
+    )
+
+
+def _expected_embedding_model_version(config: dict, model: "EmbeddingModel") -> str:
+    # Prefer the loaded model's value. In production it mirrors the configured
+    # version, while tests or injected models remain isolated from real caches.
+    return getattr(model, "model_version", None) or config.get("embedding", {}).get(
+        "model_version"
+    ) or "unknown"
+
+
+# ---------------------------------------------------------------------------- #
 # Qdrant wiring
 # ---------------------------------------------------------------------------- #
 def _maybe_connect_qdrant(
     config: dict, model: "EmbeddingModel", kb: KnowledgeBase
 ) -> QdrantAdapter | None:
-    qcfg = config.get("qdrant", {})
+    qcfg = _qdrant_config_with_environment(config.get("qdrant", {}))
     if not qcfg.get("enabled", False):
         logger.info("Qdrant disabled; using Python cosine fallback (Rule 8).")
         return QdrantAdapter.from_config(qcfg)  # available stays False
@@ -451,6 +595,45 @@ def _load_config() -> dict:
         config = json.load(fh)
     if not isinstance(config, dict):
         raise ValueError("infrastructure_config.json must be a JSON object")
+    return InfrastructureConfig.model_validate(config).model_dump()
+
+
+def _load_environment() -> None:
+    """Load local development settings without overriding real process environment."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        logger.warning("python-dotenv is unavailable; continuing with process environment only.")
+        return
+    load_dotenv(override=False)
+
+
+def _configure_logging() -> None:
+    """Apply the documented log level while preserving handlers set by the host."""
+    level_name = os.environ.get("LOG_LEVEL", "INFO").strip().upper()
+    level = getattr(logging, level_name, None)
+    if not isinstance(level, int):
+        logger.warning("Ignoring invalid LOG_LEVEL=%r; using INFO.", level_name)
+        level = logging.INFO
+    logging.getLogger().setLevel(level)
+
+
+def _qdrant_config_with_environment(qdrant_config: dict) -> dict:
+    """Apply documented Qdrant environment overrides while keeping config immutable."""
+    config = dict(qdrant_config)
+    host = os.environ.get("QDRANT_HOST", "").strip()
+    if host:
+        config["host"] = host
+
+    raw_port = os.environ.get("QDRANT_PORT", "").strip()
+    if raw_port:
+        try:
+            port = int(raw_port)
+            if not 1 <= port <= 65535:
+                raise ValueError("port must be in range 1..65535")
+            config["port"] = port
+        except ValueError:
+            logger.warning("Ignoring invalid QDRANT_PORT=%r; using config value.", raw_port)
     return config
 
 

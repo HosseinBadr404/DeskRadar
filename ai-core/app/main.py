@@ -26,7 +26,7 @@ Contracts:
 
 from __future__ import annotations
 
-import importlib.util
+import importlib
 import logging
 from contextlib import asynccontextmanager
 
@@ -108,12 +108,18 @@ def _maybe_initialize_analyzer() -> None:
     Initialize the Analyzer only if its module is installed. Its presence,
     absence, or failure must never affect the Infrastructure service.
     """
-    if importlib.util.find_spec("app.analyzer") is None:
+    try:
+        analyzer = importlib.import_module("app.analyzer")
+    except ModuleNotFoundError:
         logger.info("Analyzer module not present; running Infrastructure only.")
         return
-    try:
-        from app.analyzer import initialize_analyzer  # type: ignore
 
+    initialize_analyzer = getattr(analyzer, "initialize_analyzer", None)
+    if not callable(initialize_analyzer):
+        logger.info("Analyzer has no initializer; running Infrastructure only.")
+        return
+
+    try:
         initialize_analyzer()
         logger.info("Analyzer initialized.")
     except Exception:  # noqa: BLE001 - Analyzer failure must not break Infrastructure

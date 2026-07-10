@@ -4,6 +4,9 @@
     "model_version": "multilingual-MiniLM-L12-v2-v1",
     "cache_dir": ".model_cache"
   },
+  "ticket_embeddings": {
+    "cache_path": "data/.cache/ticket_embeddings.json"
+  },
   "similarity": {
     "top_k": 5,
     "threshold_similar": 0.70,

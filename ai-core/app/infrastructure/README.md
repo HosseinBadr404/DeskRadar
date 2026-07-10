@@ -116,7 +116,7 @@ ai-core/
 │       ├── knowledge_base.py            # load_articles(), build_article_embeddings(), find_related_article()
 │       ├── incident_detector.py         # detect_incident_candidate()
 │       ├── qdrant_adapter.py            # optional Qdrant transport
-│       └── evaluation.py                # offline eval (similarity quality, threshold sweep, category accuracy)
+│       └── evaluation.py                # offline eval (similarity quality, threshold sweep, retrieval category accuracy)
 ├── config/
 │   └── infrastructure_config.json       # all tunable thresholds
 ├── data/
@@ -167,9 +167,10 @@ hardcoded in Python. Defaults:
 {
   "embedding":  { "model_name": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
                   "model_version": "multilingual-MiniLM-L12-v2-v1", "cache_dir": ".model_cache" },
-  "similarity": { "top_k": 5, "threshold_similar": 0.75, "threshold_very_similar": 0.85 },
+  "ticket_embeddings": { "cache_path": "data/.cache/ticket_embeddings.json" },
+  "similarity": { "top_k": 5, "threshold_similar": 0.70, "threshold_very_similar": 0.85 },
   "knowledge_base": { "article_score_min": 0.70, "cache_path": "data/.cache/article_embeddings.json" },
-  "incident_detection": { "similarity_floor": 0.75, "medium_min_tickets": 2,
+  "incident_detection": { "similarity_floor": 0.70, "medium_min_tickets": 2,
                           "medium_max_tickets": 3, "high_min_tickets": 4 },
   "qdrant": { "enabled": false, "host": "localhost", "port": 6333,
               "collection_tickets": "tickets", "collection_articles": "articles",
@@ -177,7 +178,8 @@ hardcoded in Python. Defaults:
 }
 ```
 
-Runtime settings live in `.env` (no thresholds, no secrets):
+Runtime settings live in `.env` (no thresholds, no secrets). It is loaded at
+infrastructure startup; explicit process environment values take precedence.
 
 | Var | Purpose | Default |
 |---|---|---|
@@ -186,7 +188,6 @@ Runtime settings live in `.env` (no thresholds, no secrets):
 | `INFRASTRUCTURE_CONFIG_PATH` | path to the config file | `config/infrastructure_config.json` |
 | `HF_HOME` | model weight cache dir | `.model_cache` |
 | `QDRANT_HOST` / `QDRANT_PORT` / `QDRANT_API_KEY` | optional Qdrant connection | localhost / 6333 / *(empty)* |
-| `AI_CORE_HOST` / `AI_CORE_PORT` | server bind | `0.0.0.0` / `8001` |
 
 > Coherence note: keep `incident_detection.similarity_floor ≤ similarity.threshold_similar`,
 > and `medium_max_tickets + 1 == high_min_tickets`. The service warns (not crashes)
@@ -244,6 +245,9 @@ Always returns HTTP **200**; controlled failures appear in the `error` field.
   "title": "VPN وصل نمیشه",
   "description": "خطای احراز هویت میده و نیم ساعت دیگه جلسه دارم",
   "category": "vpn",
+  "open_incidents": [
+    { "incident_id": 7, "category": "vpn", "matched_ticket_ids": [18, 22, 35] }
+  ],
   "old_tickets": [
     { "ticket_id": 18, "title": "VPN خطا میده", "description": "...", "category": "vpn", "status": "open" }
   ]
@@ -265,7 +269,8 @@ Always returns HTTP **200**; controlled failures appear in the `error` field.
     "fa_title_incident": "رخداد احتمالی در سرویس VPN",
     "fa_reason_incident": "۴ تیکت مشابه با میانگین شباهت ۰.۸۹ در دسته VPN شناسایی شد.",
     "matched_ticket_ids": [18, 22, 35, 41],
-    "avg_similarity_score": 0.89, "is_duplicate": false
+    "avg_similarity_score": 0.89, "is_duplicate": false,
+    "duplicate_incident_id": null
   },
   "embedding_model_version": "multilingual-MiniLM-L12-v2-v1",
   "latency_ms": 340.5,
@@ -290,6 +295,9 @@ Always returns HTTP **200**; controlled failures appear in the `error` field.
 
 ## Contract with Backend (pool semantics)
 
+The complete handoff payload and persistence rules are in
+[`docs/backend_integration_contract.md`](../../docs/backend_integration_contract.md).
+
 In the **default mode (Qdrant disabled)**, `/analyze-ticket` searches **only the
 `old_tickets` array supplied in the request body** — not the startup seed pool.
 The Backend MUST send the relevant pool of existing tickets on every request;
@@ -300,8 +308,13 @@ an empty `old_tickets` yields empty `similar_tickets` and no incident (this is v
   Python path it is not searched.
 - `/health` → `tickets_in_pool` reports the size of that **seed** pool, so it is
   only meaningful when Qdrant is enabled. It does not reflect the per-request pool.
-- Embeddings of repeated tickets are cached across requests (keyed by id + text
-  hash), so re-sending the same pool does not re-embed it.
+- Embeddings of repeated tickets are cached across requests **and service
+  restarts**, keyed by ticket ID + text hash + model version. A changed ticket
+  text or model version is embedded again; unchanged tickets are not.
+- For incident deduplication, the Backend sends `open_incidents` with each
+  incident's ID, category, and matched ticket IDs. A candidate is a duplicate
+  only when it shares at least one matched ticket with an open incident in the
+  same category; `duplicate_incident_id` identifies the incident to update.
 
 
 ---
@@ -346,8 +359,9 @@ files and writes `docs/evaluation.md`:
   pairs, the separation gap (target **> 0.15**), pass rate, and a recommended
   threshold.
 - **Threshold sweep** — pass rate across candidate thresholds; recommends the best.
-- **Category accuracy** — for each labeled eval ticket, the nearest tickets vote on
-  category; reports overall and per-category accuracy.
+- **Retrieval category accuracy** — for each labeled eval ticket, the nearest
+  tickets vote on category; reports overall and per-category accuracy. This
+  measures retrieval quality, not the separate Analyzer model.
 
 > **Selected operating threshold:** `similarity.threshold_similar = 0.70`. Among the
 > Taskbook §9.8 candidates {0.70, 0.75, 0.78, 0.82}, 0.70 has the highest pass rate
@@ -387,7 +401,9 @@ never-raise, degraded mode).
 `pytest` modules consume these fixtures with a deterministic mock embedding model
 (no real model download required): `test_embedding_model.py`, `test_similarity_search.py`,
 `test_knowledge_base.py`, `test_incident_detector.py`, `test_pipeline.py`, and
-`test_ci_rules.py` (Rule-6 import guard) — **12 tests, all passing** (`pytest -q`).
+`test_ci_rules.py` (Rule-6 import guard), `test_ticket_embedding_cache.py`,
+`test_persian_pipeline.py`, `test_api_resilience.py`, and
+`test_config_environment.py`, and `test_evaluation.py` — **22 tests, all passing** (`pytest -q`).
 
 ---
 
@@ -404,8 +420,7 @@ never-raise, degraded mode).
 
 ## Project status
 
-The AI Infrastructure component is **complete** (all 21 roadmap steps implemented
-and validated). Recommended follow-ups before production: run the evaluation against
-the real model and confirm the separation gap clears 0.15. (The `pytest` suite over the
-fixtures and the CI rule asserting `evaluation.py` is never imported by the live path
-are already in place.)
+The standalone AI Infrastructure component is ready for the default Python-cosine
+mode with Qdrant disabled. Before production, rerun the evaluation with the real
+model, confirm the separation gap clears 0.15, and complete the documented
+Backend/Analyzer integration contract.

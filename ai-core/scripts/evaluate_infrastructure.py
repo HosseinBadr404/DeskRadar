@@ -80,7 +80,7 @@ def _render_markdown(sim, sweep, cat, model_version: str) -> str:
         "",
         f"**Recommended threshold:** {sweep.recommended_threshold}",
         "",
-        "## Category Accuracy",
+        "## Retrieval Category Accuracy",
         "",
         f"Overall: **{cat.correct} / {cat.total_evaluated} = {cat.accuracy}**",
         "",
@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         sim = ev.eval_similarity_quality(args.eval_set, args.pairs, model, config)
         sweep = ev.eval_threshold_sweep(args.eval_set, args.pairs, model, config)
-        cat = ev.eval_category_accuracy(args.eval_set, args.old_tickets, model, config)
+        cat = ev.eval_retrieval_category_accuracy(args.eval_set, args.old_tickets, model, config)
     except ValueError as exc:
         logger.error("Evaluation pre-flight failed: %s", exc)
         return 1
@@ -139,7 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         f"recommended={sim.recommended_threshold}"
     )
     print(f"  threshold sweep recommended={sweep.recommended_threshold}")
-    print(f"  category accuracy={cat.accuracy} ({cat.correct}/{cat.total_evaluated})")
+    print(f"  retrieval category accuracy={cat.accuracy} ({cat.correct}/{cat.total_evaluated})")
 
     if sim.separation_gap <= _GAP_TARGET:
         logger.warning(

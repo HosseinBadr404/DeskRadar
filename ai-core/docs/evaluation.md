@@ -28,7 +28,7 @@ Embedding model version: `multilingual-MiniLM-L12-v2-v1`
 
 **Recommended threshold:** 0.65
 
-## Category Accuracy
+## Retrieval Category Accuracy
 
 Overall: **56 / 60 = 0.9333**
 
