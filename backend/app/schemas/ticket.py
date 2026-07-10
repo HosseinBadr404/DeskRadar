@@ -1,20 +1,15 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
-from enum import Enum
-
-class Ticket_Status(str, Enum):
-    PENDING   = "pending"
-    COMPLETED = "completed"
-    FAILED    = "failed"
+from app.core.data_enum import Ticket_Status, Analysis_Status
 
 
 class TicketCreateRequest(BaseModel):
 
     title: str
     description: str
-    requester: str
-    department: str
+    requester: Optional[str] = None
+    department: Optional[str] = None
 
 
 class TicketResponse(BaseModel):
@@ -24,7 +19,8 @@ class TicketResponse(BaseModel):
     description: str
     requester: str
     department: str
-    status: Ticket_Status = Ticket_Status.PENDING
+    analysis_status: Analysis_Status = Analysis_Status.PENDING
+    ticket_status: Ticket_Status = Ticket_Status.OPEN
     created_at: datetime
 
 
