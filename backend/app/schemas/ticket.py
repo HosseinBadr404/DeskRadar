@@ -15,7 +15,7 @@ class TicketCreateRequest(BaseModel):
 
 class TicketResponse(BaseModel):
 
-    id: int
+    ticket_id: int
     title: str
     description: str
     requester: str
