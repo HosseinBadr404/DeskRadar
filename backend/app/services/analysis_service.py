@@ -5,42 +5,52 @@ from app.models.ticket_analysis import TicketAnalysis
 
 class AnalysisService:
 
-    def analyze_ticket(self, title: str, description: str):
+    async def analyze_ticket(self, ticket_id: int, title: str, description: str) -> dict:
 
         text = f"{title} {description}".lower()
 
         category = "general"
+        category_label_fa = "عمومی" 
         urgency = "low"
 
         # Simple keyword analysis
         if "vpn" in text:
             category = "network"
+            category_label_fa = "شبکه و اینترنت"
 
-        if "server" in text:
-            category = "infrastructure"
+        elif "server" in text:
+            category = "server"
+            category_label_fa = "سرور"
 
         if "urgent" in text:
+            urgency = "mediume"
+
+        elif "critical" in text:
             urgency = "high"
-
-        if "critical" in text:
-            urgency = "critical"
-
-        summary = f"Issue related to {category}"
-
-        reply = "Our technical team is investigating the issue."
 
         confidence = 0.91
 
-        raw_ai_response = "Simulated AI response"
+        analysis_respo = {
+            "category": category,
+            "category_label_fa": category_label_fa,
+            "category_score": 0.5,
+            "intent": "Problem",
+            "intent_label_fa": "مشکل",
+            "urgency": urgency,
+            "urgency_score": 50,
+            "sentiment": "fucking angree",
+            "summary_fa": "وحشی",
+            "suggested_reply_fa": "از چت جی پی تی بپرس",
+            "confidence": confidence,
+            "reasons_fa": ["کار بلد نیستی", "هنوز خیلی نوبی"]
+        }
 
-        analysis = TicketAnalysis(
-            category=category,
-            intent="issue_detection",
-            urgency=urgency,
-            summary=summary,
-            reply=reply,
-            confidence=confidence,
-            raw_ai_response=raw_ai_response
-        )
+        result = {
+            "ticket_id" : ticket_id,
+            "intelligence" : "Coming soon...",
+            "analysis" : analysis_respo
+        }
+            
+        
 
-        return analysis
+        return result

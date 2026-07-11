@@ -34,6 +34,13 @@ class TicketRepository:
             if T.get("fingerprint")==finger_print:
                 return T
         return None
+    
+    async def get_by_id(self, target_ticket_id: int)-> Optional[dict]:
+
+        for T in FAKE_TICKETS_DB:
+            if T.get("ticket_id") == target_ticket_id:
+                return T
+        return None
 
     
     async def save_new_ticket(self, title: str, 
@@ -51,18 +58,32 @@ class TicketRepository:
             "ticket_id": _id_counter,
             "title": title,
             "description": description,
-            "requester_name": requester or "None",
+            "requester": requester or "None",
             "department": department or "None",
             "ticket_status": Ticket_Status.OPEN,
             "analysis_status": Analysis_Status.PENDING,
             "source": "manual",
             "fingerprint": FINGER_PRINT,
             "created_at": datetime.now(),
-            "updated_at": datetime.now()
+            "updated_at": datetime.now(),
+
+            "ai_analysis" : None
         }
 
         _id_counter+= 1;
         FAKE_TICKETS_DB.append(new_ticket)
 
         return new_ticket
+    
+    async def update_ticket_analysis(self, 
+                              ticket_id: int, 
+                              new_analysis_status: Analysis_Status, 
+                              new_analysis_data: Optional[dict] = None)-> None:
+        
+        for T in FAKE_TICKETS_DB:
+            if T.get("ticket_id")== ticket_id:
+                T["ai_analysis"] = new_analysis_data
+                T["analysis_status"] = new_analysis_status
+                T["updated_at"] = datetime.now()
+                break
 
